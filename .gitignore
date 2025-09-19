@@ -1,0 +1,18 @@
+# Віртуальні середовища
+.venv/
+venv/
+env/
+
+# Кеші та службові файли
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.DS_Store
+
+# Логи
+*.log
+
+# Конфіг VS Code / PyCharm
+.vscode/
+.idea/

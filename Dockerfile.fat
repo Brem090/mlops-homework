@@ -1,0 +1,27 @@
+# Fat-образ на базі повного образу Python
+FROM python:3.9-bullseye
+
+# Встановлення робочої директорії
+WORKDIR /app
+
+# Встановлення залежностей.
+# Спочатку виконується встановлення numpy<2
+RUN pip install --no-cache-dir "numpy<2"
+
+# Встановлення torch + torchvision для CPU
+RUN pip install --no-cache-dir torch==1.13.1+cpu torchvision==0.14.1+cpu \
+    -f https://download.pytorch.org/whl/torch_stable.html
+
+# Pillow для роботи з зображеннями
+RUN pip install --no-cache-dir pillow
+
+# Копіювання необхідних файлів в образ
+COPY inference.py .
+COPY model.pt .
+COPY imagenet_class_index.json .
+
+# Команда для запуску
+ENTRYPOINT ["python", "inference.py"]
+
+# Приклад команди для запуску, якщо не передано аргументи
+CMD ["images/dog.jpg"]
