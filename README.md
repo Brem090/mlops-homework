@@ -1,131 +1,234 @@
-# Контейнеризація ML-моделі для результативного прогнозування
+# GitOps з ArgoCD та MLflow (локальний кластер Docker Desktop)
 
-Цей проєкт є практичною демонстрацією MLOps-підходів до пакування та оптимізації ML-сервісів. Основна мета — контейнеризувати PyTorch-модель (MobileNetV2) для ефективного прогнозування, порівняти стандартний та оптимізований підходи до створення Docker-образів, а також автоматизувати налаштування робочого середовища.
+## Огляд проєкту
 
-## Зміст
+Цей проєкт демонструє практичну реалізацію **GitOps-підходу** для автоматизованого розгортання MLflow за допомогою ArgoCD. Інфраструктура розгорнута у **локальному Kubernetes-кластері Docker Desktop**, що дозволяє безпечно відпрацювати всі етапи без витрат на хмарні ресурси.
+Архітектура проєкту відтворює логіку, призначену для AWS EKS, але адаптована під локальне середовище.
 
-- [Проєкт](#проєкт)
-- [Структура Директорії](#структура-директорії)
-- [Вимоги до Системи](#вимоги-до-системи)
-- [Покрокова Інструкція](#покрокова-інструкція)
-  - [Крок 1: Клонування Репозиторію](#крок-1-клонування-репозиторію)
-  - [Крок 2: Налаштування Середовища](#крок-2-налаштування-середовища)
-  - [Крок 3: Підготовка ML-артефактів](#крок-3-підготовка-ml-артефактів)
-  - [Крок 4: Збірка Docker-образів](#крок-4-збірка-docker-образів)
-  - [Крок 5: Запуск Inference](#крок-5-запуск-inference)
-- [Аналіз: Fat vs. Slim Образи](#аналіз-fat-vs-slim-образи)
-- [Подальша Оптимізація](#подальша-оптимізація)
+## Архітектура рішення
 
-## Проєкт
+- **Docker Desktop Kubernetes** — локальний кластер для розгортання сервісів
+- **ArgoCD** (namespace `infra-tools`) — інструмент GitOps, розгорнутий через Terraform
+- **MLflow Application** — декларативний опис у Git-репозиторії, який синхронізує ArgoCD
+- **MLflow Tracking Server** — сервіс у namespace `mlflow`, доступний через порт `5000`
 
-Цей репозиторій містить усе необхідне для створення двох Docker-образів для inference-сервісу на базі моделі MobileNetV2, серіалізованої за допомогою TorchScript.
-
-- **"Fat" образ**: Стандартний підхід, що базується на повноцінному образі Python і включає всі залежності та системні утиліти.
-
-- **"Slim" образ**: Оптимізований підхід, що використовує multi-stage builds для створення мінімалістичного runtime-середовища. Це дозволяє значно зменшити розмір образу, підвищити безпеку та прискорити розгортання.
-
-## Структура Директорії
+## Структура репозиторію
 
 ```
-.
-├── Dockerfile.fat           # Dockerfile для "важкого" образу
-├── Dockerfile.slim          # Dockerfile для оптимізованого образу
-├── export_model.py          # Скрипт для експорту моделі в .pt формат
-├── images/                  # Директорія для тестових зображень
-│   └── cat.jpg
-├── inference.py             # Основний скрипт для запуску inference
-├── install_dev_tools.sh     # Bash-скрипт для автоматизації налаштування середовища
-├── model.pt                 # Серіалізована модель (генерується скриптом)
-└── report.md                # Детальний звіт-порівняння образів
+mlflow-gitops/
+├── terraform/
+│   └── argocd/
+│       ├── backend.tf
+│       ├── main.tf
+│       ├── terraform.tf
+│       ├── variables.tf
+│       └── values/
+│           └── argocd-values.yaml
+├── mlflow/
+│   └── application.yaml
+└── namespaces/
+    └── mlflow-ns.yaml
 ```
 
-## Вимоги до Системи
+### Опис директорій
 
-Для роботи з проєктом вам знадобляться:
+- `terraform/argocd` — Terraform-модуль для розгортання ArgoCD
+- `mlflow/application.yaml` — декларативний опис ArgoCD Application з вбудованою конфігурацією Helm (values)
+- `namespaces/mlflow-ns.yaml` — визначення namespace
 
-- **ОС**: Linux (рекомендовано Ubuntu 20.04+)
-- **Git**: для клонування репозиторію
-- **Python**: версія 3.9 або вище
-- **Docker Engine**: версія 20.10 або вище
-- **Docker Compose**
+> **Важливо:** Всі налаштування MLflow (включно з backend store) вбудовані безпосередньо в `application.yaml`, окремий файл `values.yaml` не потрібен.
 
-Для автоматичного встановлення цих компонентів на Debian-based системах ви можете використати скрипт `install_dev_tools.sh`.
+## Конфігурація ArgoCD Application
 
-## Покрокова Інструкція
+Файл `mlflow/application.yaml` описує ArgoCD Application з **вбудованою конфігурацією Helm**:
 
-### Крок 1: Клонування Репозиторію
+**Git-репозиторій з конфігурацією:** https://github.com/Brem090/my-mlops-apps.git
+
+**Helm chart:** https://community-charts.github.io/helm-charts (chart `mlflow` версії 0.7.16)
+
+Повна конфігурація в `application.yaml`:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow
+  namespace: infra-tools
+spec:
+  project: default
+  source:
+    repoURL: 'https://community-charts.github.io/helm-charts'
+    chart: mlflow
+    targetRevision: 0.7.16
+    helm:
+      values: |
+        backend_store:
+          type: sqlite
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlflow
+  syncPolicy:
+    automated:
+      prune: true      
+      selfHeal: true    
+    syncOptions:
+      - CreateNamespace=true
+```
+
+### Як працює GitOps-підхід у цьому проєкті
+
+1. Файл `application.yaml` зберігається у вашому Git-репозиторії з усіма налаштуваннями
+2. ArgoCD підхоплює Helm chart з публічного репозиторію community-charts
+3. ArgoCD застосовує вбудовані налаштування (`values`) до chart
+4. При змінах `application.yaml` у Git ArgoCD автоматично синхронізує стан кластера
+5. Всі зміни конфігурації відстежуються через Git-історію
+
+> 📌 **Примітка:** У цій архітектурі всі налаштування (включно з `backend_store`) вбудовані безпосередньо в `application.yaml`, що робить конфігурацію більш компактною та самодостатньою.
+
+Необхідно встановити:
+
+- **Docker Desktop** з увімкненим Kubernetes
+- **Terraform** (версія 1.5.0 або вище)
+- **kubectl**
+
+### Перевірка підключення
 
 ```bash
-git clone https://gitlab.com/ваш-namespace/ваш-проєкт.git
-cd ваш-проєкт
+kubectl get nodes
 ```
 
-### Крок 2: Налаштування Середовища
+Очікуваний результат: вузол `docker-desktop` у статусі `Ready`.
 
-Скрипт `install_dev_tools.sh` автоматично перевірить та встановить усі необхідні залежності.
+
+## Інструкція з розгортання
+
+### Крок 1. Розгортання ArgoCD
 
 ```bash
-# Надає права на виконання
-chmod +x install_dev_tools.sh
-
-# Запускає скрипт
-./install_dev_tools.sh
+cd terraform\argocd
+terraform init
+terraform apply -auto-approve
 ```
 
-> **Примітка**: Скрипт використовує `sudo` для встановлення системних пакетів і може запитати ваш пароль. Весь процес логується у файл `install.log`.
-
-### Крок 3: Підготовка ML-артефактів
-
-Перед збіркою образів необхідно згенерувати модель та завантажити метадані.
-
-**Експорт моделі у формат TorchScript:**
+Перевірка успішності розгортання:
 
 ```bash
-python3 export_model.py
+kubectl get pods -n infra-tools
 ```
 
-Ця команда створить у корені проєкту файл `model.pt`.
+Очікуваний результат: pod-и з префіксом `argocd-` у статусі `Running`.
 
-**Завантаження класів ImageNet:**
+### Крок 2. Доступ до ArgoCD UI
+
+**Відкрийте новий термінал** та налаштуйте port-forward для доступу до інтерфейсу:
 
 ```bash
-wget https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
+kubectl port-forward svc/argocd-server -n infra-tools 8080:443
 ```
 
-### Крок 4: Збірка Docker-образів
+> ⚠️ **Важливо:** Залишіть цей термінал відкритим — port-forward має працювати постійно для доступу до ArgoCD UI.
 
-Зберіть обидва образи для подальшого порівняння.
+Відкрийте браузер за адресою: **http://localhost:8080**
 
-**"Fat" образ (тег: fat-model):**
+**У третьому терміналі** отримайте пароль адміністратора:
+
+**Для PowerShell:**
+```powershell
+[System.Text.Encoding]::UTF8.GetString(
+  [System.Convert]::FromBase64String(
+    (kubectl -n infra-tools get secret argocd-initial-admin-secret -o jsonpath='{.data.password}')
+  )
+)
+```
+
+**Для Linux/macOS:**
+```bash
+kubectl -n infra-tools get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 --decode
+```
+
+- **Логін:** `admin`
+- **Пароль:** результат виконання команди
+
+### Крок 3. Розгортання MLflow
+
+**Поверніться до першого терміналу** (або відкрийте четвертий) та застосуйте конфігурацію:
 
 ```bash
-docker build -t fat-model -f Dockerfile.fat .
+kubectl apply -f mlflow\application.yaml -n infra-tools
 ```
 
-**"Slim" образ (тег: slim-model):**
+ArgoCD автоматично підхопить конфігурацію з Git-репозиторію, вказаного у `application.yaml`.
+
+**Перевірка статусу деплою через CLI:**
 
 ```bash
-docker build -t slim-model -f Dockerfile.slim .
+# Перевірити статус Application
+kubectl get application mlflow -n infra-tools
+
+# Перевірити деталі синхронізації
+kubectl describe application mlflow -n infra-tools
 ```
 
-### Крок 5: Запуск Inference
+**Перевірка через UI:**
 
-Запустіть контейнер, передавши йому як аргумент шлях до тестового зображення.
+У веб-інтерфейсі ArgoCD (http://localhost:8080) ви побачите:
+- Застосунок `mlflow` у списку Applications
+- Статус має бути **Synced** (зелена галочка) — конфігурація синхронізована з Git
+- Статус має бути **Healthy** (зелене серце) — всі ресурси працюють коректно
+
+> 💡 **Підказка:** Клацніть на застосунок `mlflow` у UI ArgoCD, щоб побачити візуальну схему всіх розгорнутих ресурсів Kubernetes.
+
+### Крок 4. Перевірка роботи MLflow
+
+Переконайтеся, що всі ресурси створені:
 
 ```bash
-# Запуск "важкого" образу
-docker run --rm -v "$(pwd)/images":/app/images fat-model images/dog.jpg
-
-# Запуск оптимізованого образу
-docker run --rm -v "$(pwd)/images":/app/images slim-model images/dog.jpg
+kubectl get pods -n mlflow
+kubectl get svc -n mlflow
 ```
 
-У консолі ви побачите топ-3 передбачення для вашого зображення з відсотком ймовірності.
+**Відкрийте ще один новий термінал** та налаштуйте доступ до MLflow:
 
-## Аналіз: Fat vs. Slim Образи
+```bash
+kubectl port-forward svc/mlflow -n mlflow 5000:5000
+```
 
-Детальне порівняння характеристик образів та рекомендації щодо оптимізації можна знайти в файлі `report.md`.
+> ⚠️ **Важливо:** Залишіть цей термінал відкритим — port-forward має працювати для доступу до MLflow UI.
 
-## Подальша Оптимізація
+Відкрийте браузер за адресою: **http://localhost:5000**
 
-Проєкт демонструє базові принципи контейнеризації ML-моделей. Для production-середовища рекомендується розглянути додаткові оптимізації, такі як використання multi-architecture builds, кешування шарів та інтеграцію з CI/CD pipeline.
+### Підсумок активних терміналів
+
+Після завершення всіх кроків у вас має бути:
+
+- **Термінал 1:** Вільний для виконання команд
+- **Термінал 2:** Port-forward для ArgoCD (порт 8080)
+- **Термінал 3:** Port-forward для MLflow (порт 5000)
+
+## Очищення ресурсів
+
+Для видалення всіх створених ресурсів:
+
+```bash
+# Видалення MLflow Application
+kubectl delete application mlflow -n infra-tools
+kubectl delete ns mlflow
+
+# Видалення ArgoCD через Terraform
+cd terraform\argocd
+terraform destroy -auto-approve
+```
+
+За потреби можна вимкнути Kubernetes у Docker Desktop: **Settings → Kubernetes → зняти прапорець "Enable Kubernetes"**
+
+## Результати роботи
+
+Після успішного розгортання ви отримаєте:
+
+- **ArgoCD** у namespace `infra-tools` → http://localhost:8080
+- **MLflow Tracking Server** у namespace `mlflow` → http://localhost:5000
+- Повністю функціональну GitOps-інфраструктуру з автоматичною синхронізацією змін
+
+## Висновок
+
+Проєкт демонструє повноцінну реалізацію GitOps-підходу у **локальному середовищі Docker Desktop**. README повністю адаптовано під Windows PowerShell з альтернативними командами для Linux/macOS. Це дозволяє безпечно та без витрат відпрацювати інтеграцію ArgoCD та MLflow.
