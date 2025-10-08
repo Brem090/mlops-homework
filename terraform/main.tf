@@ -1,6 +1,8 @@
 provider "aws" {
-  region = "eu-north-1" # або твій регіон
+  region = "eu-north-1"
 }
+
+data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "lambda_role" {
   name = "lambda_exec_role"
@@ -16,12 +18,11 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# Дозвіл Lambda писати логи в CloudWatch
+# Дозволяємо Lambda писати логи в CloudWatch
 resource "aws_iam_role_policy_attachment" "lambda_policy" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
-
 
 resource "aws_lambda_function" "validate" {
   function_name = "validate-fn"
@@ -53,46 +54,72 @@ resource "aws_iam_role" "step_role" {
   })
 }
 
+# Основна політика для Step Functions
 resource "aws_iam_role_policy_attachment" "step_policy" {
   role       = aws_iam_role.step_role.name
   policy_arn = "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
 }
 
+resource "aws_iam_policy" "step_invoke_lambda_policy" {
+  name        = "stepfunction_invoke_lambda_policy"
+  description = "Allow Step Functions to invoke Lambda functions"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = "arn:aws:lambda:eu-north-1:${data.aws_caller_identity.current.account_id}:function:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "step_invoke_lambda_attach" {
+  role       = aws_iam_role.step_role.name
+  policy_arn = aws_iam_policy.step_invoke_lambda_policy.arn
+}
 
 resource "aws_sfn_state_machine" "train_pipeline" {
   name     = "TrainModelPipeline"
   role_arn = aws_iam_role.step_role.arn
 
   definition = jsonencode({
-    Comment = "Training pipeline with validation and metrics logging",
-    StartAt = "ValidateData",
+    Comment = "Training pipeline with validation and metrics logging"
+    StartAt = "ValidateData"
     States = {
       ValidateData = {
-        Type     = "Task",
-        Resource = aws_lambda_function.validate.arn,
+        Type     = "Task"
+        Resource = aws_lambda_function.validate.arn
         Next     = "LogMetrics"
-      },
+      }
       LogMetrics = {
-        Type     = "Task",
-        Resource = aws_lambda_function.log_metrics.arn,
+        Type     = "Task"
+        Resource = aws_lambda_function.log_metrics.arn
         End      = true
       }
     }
   })
 }
 
+output "account_id" {
+  value       = data.aws_caller_identity.current.account_id
+  description = "Current AWS account ID"
+}
 
 output "step_function_arn" {
   value       = aws_sfn_state_machine.train_pipeline.arn
-  description = "ARN of the AWS Step Function"
+  description = "ARN of the Step Function pipeline"
 }
 
 output "lambda_validate_arn" {
   value       = aws_lambda_function.validate.arn
-  description = "ARN of the validate Lambda function"
+  description = "ARN of the Validate Lambda"
 }
 
 output "lambda_log_metrics_arn" {
   value       = aws_lambda_function.log_metrics.arn
-  description = "ARN of the log_metrics Lambda function"
+  description = "ARN of the LogMetrics Lambda"
 }
