@@ -1,0 +1,59 @@
+# ===============================
+# Python
+# ===============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ===============================
+# Virtual Environments
+# ===============================
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ===============================
+# Lambda Artifacts
+# ===============================
+*.zip
+!lambda/.gitkeep  # якщо хочеш зберегти порожню папку lambda
+
+# ===============================
+# Terraform
+# ===============================
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.tfvars.lock.info
+
+# ===============================
+# AWS Credentials (на всяк випадок)
+# ===============================
+*.pem
+*.key
+*.env
+aws_credentials.txt
+
+# ===============================
+# VS Code / System files
+# ===============================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Logs
+# ===============================
+*.log
+logs/
