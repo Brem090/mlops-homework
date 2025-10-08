@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://community-charts.github.io/helm-charts
+    chart: mlflow
+    targetRevision: 0.7.19
+    helm:
+      values: |
+        backendStore:
+          databaseMigration: true            # ✅ увімкнути міграції
+          databaseConnectionCheck: true      # ✅ чек доступності БД
+          postgres:
+            enabled: true
+            host: "mlflow-postgres-postgresql.mlflow.svc.cluster.local" # ✅ правильний сервіс Postgres
+            port: 5432
+            database: "mlflow"
+            user: "mlflow"
+            password: "mlflowpass"           # ✅ має збігатися з bitnami/postgresql
+        artifactRoot:
+          s3:
+            enabled: true
+            bucket: "mlflow-artifacts"       # ✅ бакет має існувати в MinIO
+            awsAccessKeyId: "minioadmin"
+            awsSecretAccessKey: "minioadmin123"
+        extraEnvVars:
+          MLFLOW_S3_ENDPOINT_URL: "http://minio.mlflow.svc.cluster.local:9000"
+          AWS_ACCESS_KEY_ID: "minioadmin"
+          AWS_SECRET_ACCESS_KEY: "minioadmin123"
+        service:
+          type: ClusterIP
+          port: 5000
+        resources:
+          requests:
+            memory: 128Mi
+            cpu: 100m
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
