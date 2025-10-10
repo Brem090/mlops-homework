@@ -1,4 +1,4 @@
-**Автоматизоване тренування моделей: MLOps-проєкт на базі AWS Lambda, Step Functions і GitHub Actions**
+# Автоматизоване тренування моделей: MLOps-проєкт на базі AWS Lambda, Step Functions і GitHub Actions
 
 ---
 
