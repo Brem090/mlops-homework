@@ -26,10 +26,24 @@ FEATURES_N = int(os.getenv("FEATURES_N", "20"))
 ZSCORE_THRESHOLD = float(os.getenv("ZSCORE_THRESHOLD", "3.0"))
 PROBA_THRESHOLD = float(os.getenv("PROBA_THRESHOLD", "0.5"))
 
-# ---------------- Prometheus metrics ----------------
-prediction_counter = Counter("predictions_total", "Total number of predictions")
-prediction_latency = Histogram("prediction_latency_seconds", "Prediction latency in seconds")
-drift_counter = Counter("drift_detected_total", "Total number of detected drifts")
+# ---------------- Prometheus metrics (with registry) ----------------
+prediction_counter = Counter(
+    "predictions_total",
+    "Total number of predictions",
+    registry=REGISTRY
+)
+
+prediction_latency = Histogram(
+    "prediction_latency_seconds",
+    "Prediction latency in seconds",
+    registry=REGISTRY
+)
+
+drift_counter = Counter(
+    "drift_detected_total",
+    "Total number of detected drifts",
+    registry=REGISTRY
+)
 
 # ---------------- App initialization ----------------
 app = FastAPI(title="ML Inference Service")
@@ -166,6 +180,7 @@ async def predict(request: PredictionRequest):
 
 @app.get("/metrics")
 async def metrics():
+    """Expose Prometheus metrics."""
     return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -188,7 +203,7 @@ async def health():
 async def root():
     return {
         "service": "ML Inference API",
-        "version": "2.4.0",
+        "version": "2.4.1",
         "description": "Machine Learning inference service with Z-score drift detection (EMA + 3σ).",
         "endpoints": ["/predict", "/metrics", "/health"],
     }
