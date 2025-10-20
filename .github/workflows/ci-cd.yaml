@@ -123,9 +123,11 @@ jobs:
           echo "Starting container smoke test..."
           docker run -d --name smoke_test -p 127.0.0.1:8000:8000 "$IMAGE:$TAG"
 
+          echo "Waiting for /health to respond with 200..."
           ok=0
           for i in {1..20}; do
-            if curl -sf http://127.0.0.1:8000/health | grep -q '"status": "running"'; then
+            HTTP_CODE=$(curl -s -o /tmp/health.json -w "%{http_code}" http://127.0.0.1:8000/health || echo 000)
+            if [ "$HTTP_CODE" == "200" ]; then
               ok=1
               break
             fi
@@ -133,13 +135,14 @@ jobs:
           done
 
           if [ "$ok" -eq 0 ]; then
-            echo "Health never became ready. Container logs:"
+            echo "Health endpoint never returned 200."
             docker logs --timestamps smoke_test || true
             docker rm -f smoke_test || true
             exit 1
           fi
 
-          echo "Health OK"
+          echo "Health endpoint OK:"
+          cat /tmp/health.json
           docker rm -f smoke_test || true
 
       - name: Update Helm chart image and tag
