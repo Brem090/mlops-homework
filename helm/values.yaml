@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/brem090/mlops-homework
   pullPolicy: IfNotPresent
-  tag: "296d0b511ebe7182062526f3e0bb4e144f24e559"
+  tag: "fix-ge8"
 
 service:
   type: ClusterIP
@@ -49,3 +49,4 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 5
 
+>>>>>>> 8b0e563 (Test4)

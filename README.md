@@ -287,7 +287,7 @@ curl http://localhost:8000/health
 
 ```json
 {
-  "status": "працює",
+  "status": "running",
   "model_loaded": true,
   "detector_status": "ready",
   "ref_samples": 50
@@ -316,7 +316,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/predict" `
 ```json
 {
   "prediction": 1,
-  "probability": 0.6534023807361028,
+  "probability": 0.47894225535,
   "drift_detected": false,
   "timestamp": "..."
 }
@@ -336,9 +336,8 @@ python tests/test_drift.py
 
 ### 4. Перевірка метрик
 
-```bash
-curl http://localhost:8000/metrics
-```
+Введіть у браузері
+http://localhost:8000/metrics
 
 Шукайте метрики:
 - `predictions_total` - загальна кількість передбачень
@@ -460,7 +459,7 @@ image:
 #### Метод 2: Через коміт
 
 ```bash
-# Створіть порожній коміт з магічним повідомленням
+# Створіть порожній коміт з повідомленням
 git commit --allow-empty -m "[retrain] Trigger model retraining"
 git push origin final-project
 ```
@@ -480,14 +479,71 @@ git push origin final-project
 
 ArgoCD автоматично підхопить зміни та задеплоює нову версію сервісу.
 
-## Скріншоти
+## Скриншоти
 
-Тут можна розмістити візуальні підтвердження роботи системи.
+### 1. Docker Image
 
-- **Grafana Dashboard:** Загальний вигляд дашборду, що показує метрики (RPS, Latency) та панель логів.
-- **ArgoCD UI:** Скріншот "дерева" додатку зі статусами Synced та Healthy.
-- **Drift Detection:** Збільшений скріншот панелі "Total Drift Detections" у Grafana та відповідні логи "Drift detected" у Loki.
-- **GitHub Actions:** Скріншот успішного виконання `[retrain]` пайплайну.
+Опублікований Docker образ у реєстрі:
+
+![Docker Image](screenshots/1-docker-image.jpg)
+
+---
+
+### 2. ArgoCD - Application Tree
+
+Дерево ресурсів Application:
+
+![ArgoCD Application Tree](screenshots/3-argocd-app-tree.jpg)
+
+*Візуалізація всіх Kubernetes ресурсів: Service, Deployment, ServiceMonitor, ReplicaSet та Pod у статусі Synced*
+
+---
+
+### 3. ArgoCD - Application Status
+
+Статус Application у режимі списку:
+
+![ArgoCD Application Status](screenshots/2-argocd-app-status.jpg)
+
+*Application `ml-inference-service` у стані **Healthy** та **Synced**, підключений до репозиторію на GitHub*
+
+---
+
+### 4. Prometheus - Drift Detection Rate
+
+Графік частоти виявлення дрейфу в Prometheus:
+
+![Prometheus Drift Rate](screenshots/5-prometheus-drift-rate.jpg)
+
+*Графік показує сплески drift detection rate протягом тестування*
+
+---
+
+### 5. Loki - Drift Detection Logs
+
+Логи з виявленими drift events через Loki Explore:
+
+![Loki Drift Logs](screenshots/6-loki-drift-log.jpg)
+
+*23 логи з множинними WARNING повідомленнями "Drift detected" з різними значеннями*
+
+---
+
+### 6. Grafana Dashboard - Головний вигляд
+
+Комплексний дашборд з усіма ключовими метриками:
+
+![Grafana Dashboard](screenshots/4-grafana-dashboard.jpg)
+
+---
+
+### 7. GitHub Actions - Retrain Pipeline
+
+Успішне виконання CI/CD пайплайну з кроками `test`, `retrain-model` та `build-and-push`:
+
+![GitHub Actions Retrain](screenshots/7-github-actions-retrain.jpg)
+
+*Пайплайн успішно виконав перетренування моделі*
 
 ## Troubleshooting
 
@@ -575,9 +631,15 @@ aiops-quality-project/
 │   └── dashboard.json     # Grafana Dashboard
 ├── tests/
 │   └── test_drift.py      # Тестовий скрипт для дрейфу
+├── scripts/
+│   └── quick-test.sh      # Скрипт для швидкого запуску
+├── screenshots/
+│   └── 1-doker-image.jpg  # Скриншоти для демонстрації результату
+│       └──..............
 ├── .github/
 │   └── workflows/
 │       └── ci-cd.yaml     # GitHub Actions
 ├── .gitignore
+│── .dockerignore
 └── README.md
 ```
