@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/brem090/mlops-homework
   pullPolicy: IfNotPresent
-  tag: "051173622394e2e6929d2f270bf762d157501621"
+  tag: "eca87cbc638979bf6c023984e9912ff8c33e1e49"
 
 service:
   type: ClusterIP
