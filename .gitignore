@@ -4,4 +4,3 @@
 .pytest_cache/
 venv/
 .env
-passwords.txt

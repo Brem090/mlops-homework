@@ -104,7 +104,7 @@ python -m venv venv
 source venv/bin/activate
 
 # Активуємо (Windows PowerShell)
-# .\venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.ps1
 
 # Встановлюємо залежності
 pip install -r app/requirements.txt
@@ -128,15 +128,14 @@ ls models/
 cd app
 
 # Копіюємо модель у підпапку models всередині app
-mkdir -p models
-cp ../models/model.pkl models/model.pkl
+New-Item -ItemType Directory -Force -Path models
+Copy-Item ../models/model.pkl models/model.pkl
 
 # Будуємо Docker образ
-# Для локального запуску можна залишити ml-inference-service
 docker build -t ml-inference-service:latest .
 
 # Перевіряємо
-docker images | grep "ml-inference-service"
+docker images | Select-String "ml-inference-service"
 
 # Повертаємось у корінь проєкту
 cd ..
@@ -177,16 +176,16 @@ helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
 
 # Встановлюємо kube-prometheus-stack
-helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  --create-namespace \
-  --wait \
-  --set grafana.enabled=true \
-  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
-  --set nodeExporter.enabled=false \
-  --set grafana.additionalDataSources[0].name=Loki \
-  --set grafana.additionalDataSources[0].type=loki \
-  --set grafana.additionalDataSources[0].access=proxy \
+helm upgrade --install monitoring prometheus-community/kube-prometheus-stack `
+  --namespace monitoring `
+  --create-namespace `
+  --wait `
+  --set grafana.enabled=true `
+  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false `
+  --set nodeExporter.enabled=false `
+  --set grafana.additionalDataSources[0].name=Loki `
+  --set grafana.additionalDataSources[0].type=loki `
+  --set grafana.additionalDataSources[0].access=proxy `
   --set grafana.additionalDataSources[0].url=http://loki.monitoring.svc.cluster.local:3100
 
 # Чекаємо на готовність
@@ -199,17 +198,17 @@ kubectl wait --for=condition=Ready pods --all -n monitoring --timeout=300s
 
 ```bash
 # Встановлюємо Loki Stack
-helm upgrade --install loki grafana/loki-stack \
-  --namespace monitoring \
-  --wait \
-  --set loki.enabled=true \
-  --set promtail.enabled=true \
-  --set fluent-bit.enabled=false \
-  --set grafana.enabled=false \
-  --set loki.persistence.enabled=true \
-  --set loki.persistence.size=1Gi \
-  --set loki.auth_enabled=false \
-  --set loki.image.tag=2.9.4 \
+helm upgrade --install loki grafana/loki-stack `
+  --namespace monitoring `
+  --wait `
+  --set loki.enabled=true `
+  --set promtail.enabled=true `
+  --set fluent-bit.enabled=false `
+  --set grafana.enabled=false `
+  --set loki.persistence.enabled=true `
+  --set loki.persistence.size=1Gi `
+  --set loki.auth_enabled=false `
+  --set loki.image.tag=2.9.4 `
   --set promtail.image.tag=2.9.4
 
 # Перевіряємо чи усе добре
