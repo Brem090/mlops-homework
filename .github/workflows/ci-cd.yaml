@@ -1,0 +1,129 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, final-project ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      retrain:
+        description: 'Trigger model retraining'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.event.repository.name }}  
+  DOCKER_TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+
+  retrain-model:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.retrain == 'true' || contains(github.event.head_commit.message, '[retrain]')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scikit-learn numpy
+
+      - name: Train model
+        run: |
+          cd model
+          python train.py
+          cd ..
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: models/model.pkl
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [test, retrain-model]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/final-project'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download model (if retrained)
+        if: needs.retrain-model.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: models/
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Docker build context for legacy Dockerfile
+        run: |
+          cp app/requirements.txt requirements.txt
+          cp app/main.py main.py
+          ls -la
+
+      - name: Build Docker image
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER}/${{ env.IMAGE_NAME }}"
+          TAG="${{ env.DOCKER_TAG }}"
+          echo "Building Docker image: $IMAGE:$TAG"
+
+          docker build -f app/Dockerfile \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            -t "$IMAGE:$TAG" .
+
+          docker tag "$IMAGE:$TAG" "$IMAGE:latest"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Push Docker image
+        run: |
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
+
+      - name: Update Helm chart image and tag
+        run: |
+          sed -i "s|repository: .*|repository: $IMAGE|" helm/values.yaml
+          sed -i "s/tag: .*/tag: \"$TAG\"/" helm/values.yaml
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add helm/values.yaml
+          git commit -m "Update image to $IMAGE:$TAG" || echo "No changes"
+          git push origin "${{ github.ref_name }}"
+
