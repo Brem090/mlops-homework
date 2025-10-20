@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       retrain:
-        description: 'Trigger model retraining'
+        description: "Trigger model retraining"
         required: false
-        default: 'false'
+        default: "false"
 
 permissions:
   contents: write
