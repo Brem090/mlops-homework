@@ -116,6 +116,31 @@ jobs:
         run: |
           docker push "$IMAGE:$TAG"
           docker push "$IMAGE:latest"
+      
+      - name: Smoke test container
+        run: |
+          set -euo pipefail
+          echo "Starting container smoke test..."
+          docker run -d --name smoke_test -p 127.0.0.1:8000:8000 "$IMAGE:$TAG"
+
+          ok=0
+          for i in {1..20}; do
+            if curl -sf http://127.0.0.1:8000/health | grep -q '"model_loaded": true'; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ok" -eq 0 ]; then
+            echo "Health never became ready. Container logs:"
+            docker logs --timestamps smoke_test || true
+            docker rm -f smoke_test || true
+            exit 1
+          fi
+
+          echo "Health OK"
+          docker rm -f smoke_test || true
 
       - name: Update Helm chart image and tag
         run: |
