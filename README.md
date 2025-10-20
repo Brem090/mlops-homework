@@ -274,7 +274,6 @@ kubectl logs -n ml-service -l app.kubernetes.io/name=ml-inference-service -f
 ### 1. Port-forward до сервісу (окреме вікно терміналу)
 
 ```bash
-# Завдяки fullnameOverride, ім'я сервісу стабільне
 kubectl port-forward -n ml-service svc/ml-inference-service 8000:8000
 ```
 
@@ -288,7 +287,7 @@ curl http://localhost:8000/health
 
 ```json
 {
-  "status": "healthy",
+  "status": "працює",
   "model_loaded": true,
   "detector_status": "ready",
   "ref_samples": 50
@@ -300,15 +299,16 @@ curl http://localhost:8000/health
 #### Через curl:
 
 ```bash
-curl -X POST "http://localhost:8000/predict" \
--H "Content-Type: application/json" \
--d '{
-  "features": [
-    0.5, -0.3, 1.2, 0.8, -0.5, 0.2, 0.9, -0.1,
-    0.4, 0.7, -0.6, 0.3, 0.1, -0.4, 0.6, 0.2,
-    -0.8, 0.5, 0.9, -0.2
-  ]
-}'
+Invoke-RestMethod -Uri "http://localhost:8000/predict" `
+  -Method POST `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{
+    "features": [
+      0.5, -0.3, 1.2, 0.8, -0.5, 0.2, 0.9, -0.1,
+      0.4, 0.7, -0.6, 0.3, 0.1, -0.4, 0.6, 0.2,
+      -0.8, 0.5, 0.9, -0.2
+    ]
+  }'
 ```
 
 Очікувана відповідь:
@@ -325,8 +325,6 @@ curl -X POST "http://localhost:8000/predict" \
 #### Через Python скрипт (генерація дрейфу):
 
 ```bash
-# Встановлюємо 'requests' для тестового скрипта
-pip install requests
 
 # Запускаємо тестовий скрипт
 python tests/test_drift.py
