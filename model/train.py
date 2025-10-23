@@ -17,12 +17,10 @@ warnings.filterwarnings("ignore")
 def train_model():
     print(f"[{datetime.now()}] Початок тренування ансамблевої моделі...")
 
-    # ---- Параметри ----
     rng = np.random.default_rng(42)
     n_features = 20
     n_samples = 2000
 
-    # ---- Створення датасету ----
     X, y = make_classification(
         n_samples=n_samples,
         n_features=n_features,
@@ -34,12 +32,10 @@ def train_model():
         random_state=42
     )
 
-    # ---- Поділ на train/test ----
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # ---- Окремі моделі ----
     rf = RandomForestClassifier(
         n_estimators=150,
         max_depth=12,
@@ -62,7 +58,6 @@ def train_model():
         random_state=42
     )
 
-    # ---- Ансамбль ----
     estimators = [
         ('rf', rf),
         ('gb', gb),
@@ -75,14 +70,13 @@ def train_model():
         ('clf', VotingClassifier(
             estimators=estimators,
             voting='soft',
-            weights=[2, 2, 1]  # сильніші ваги для RF і GB
+            weights=[2, 2, 1] 
         ))
     ])
 
     print(f"[{datetime.now()}] Модель: {model_name}")
     model.fit(X_train, y_train)
 
-    # ---- Оцінка ----
     y_pred_train = model.predict(X_train)
     y_pred_test = model.predict(X_test)
 
@@ -93,7 +87,6 @@ def train_model():
     print(f"[{datetime.now()}] Test  accuracy: {test_acc:.4f}")
     print(f"[{datetime.now()}] Фіч: {n_features}, зразків: {n_samples}")
 
-    # ---- Збереження ----
     base_dir = pathlib.Path(__file__).resolve().parent.parent / "models"
     base_dir.mkdir(parents=True, exist_ok=True)
 

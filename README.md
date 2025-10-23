@@ -344,25 +344,6 @@ http://localhost:8000/metrics
 - `drift_detected_total` - кількість виявлених дрейфів
 - `prediction_latency_seconds` - час відповіді
 
-### 5. Швидкий тест всіх ендпоїнтів
-
-Для зручності можна використати скрипт, який автоматично перевірить всі ендпоїнти:
-
-```bash
-# Надаємо права на виконання
-bash scripts/quick-test.sh
-
-# Запускаємо тест
-./scripts/quick-test.sh
-```
-
-Скрипт виконає:
-- ✓ Перевірку `/health` endpoint
-- ✓ Тест `/predict` з нормальними даними
-- ✓ Перевірку `/metrics` endpoint
-- ✓ 10 послідовних передбачень
-- ✓ Тест виявлення drift з аномальними даними
-
 ## Моніторинг
 
 ### Grafana Dashboard
@@ -650,8 +631,6 @@ aiops-quality-project/
 │   └── dashboard.json     # Grafana Dashboard
 ├── tests/
 │   └── test_drift.py      # Тестовий скрипт для дрейфу
-├── scripts/
-│   └── quick-test.sh      # Швидкий тест всіх ендпоїнтів
 ├── screenshots/
 │   └── 1-doker-image.jpg  # Скриншоти для демонстрації результату
 │       └──..............
